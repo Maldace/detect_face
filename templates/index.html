@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Camera App</title>
+</head>
+<body>
+  <!-- <video id="video" src="/video_feed" autoplay></video> -->
+  <video id="video" autoplay></video>
+  <script>
+    // Yêu cầu quyền dùng camera
+    navigator.mediaDevices.getUserMedia({ video: true })
+      .then(function(stream) {
+        const video = document.getElementById('video'); // lấy element video
+        video.srcObject = stream; // gán stream cho video
+
+        const canvas = document.createElement('canvas'); // tạo canvas ẩn để chụp frame
+        const ctx = canvas.getContext('2d'); // lấy context 2D
+
+        // đợi video có metadata (kích thước) rồi mới set canvas size
+        video.addEventListener('loadedmetadata', () => {
+          canvas.width = video.videoWidth;  // gán chiều rộng canvas = video
+          canvas.height = video.videoHeight; // gán chiều cao canvas = video
+        });
+
+        // hàm gửi frame lên server
+        async function sendFrame() {
+          // vẽ frame hiện tại lên canvas
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+          // chuyển canvas thành base64 JPEG
+          const imageBase64 = canvas.toDataURL('image/jpeg', 0.7); // chất lượng 0.7 để giảm size
+
+          try {
+            // gửi POST JSON tới /upload
+            const res = await fetch('/upload', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ image: imageBase64 })
+            });
+
+            // debug: in status để biết server nhận
+            console.log('Sent frame, status=', res.status);
+          } catch (err) {
+            console.error('Upload error:', err);
+          }
+        }
+
+        // gửi frame đều đặn, ví dụ mỗi 100ms (~10 FPS)
+        setInterval(sendFrame, 100);
+      })
+      .catch(err => {
+        console.error('getUserMedia error:', err); // log lỗi nếu không bật camera được
+      });
+  </script>
+</body>
+</html>
